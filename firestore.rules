@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOfficerOrAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'officer'
+        );
+    }
+
+    match /users/{uid} {
+      allow read: if (isSignedIn() && request.auth.uid == uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /alerts/{alertId} {
+      allow read: if isOfficerOrAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /flood_events/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /daily_stats/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /rain_data/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
